@@ -25,7 +25,14 @@ TIMEFRAMES = {
 # CCXT Binance Global Exchange Setup
 exchange = ccxt.binance({
     'enableRateLimit': True,
-    'options': {'defaultType': 'spot'}
+    'options': {
+        'adjustForTimeDifference': True,
+    },
+    'urls': {
+        'api': {
+            'public': 'https://data-api.binance.vision/api',
+        }
+    }
 })
 
 def send_telegram(text):
