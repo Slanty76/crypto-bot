@@ -26,14 +26,16 @@ TIMEFRAMES = {
 exchange = ccxt.binance({
     'enableRateLimit': True,
     'options': {
+        'defaultType': 'future',
         'adjustForTimeDifference': True,
     },
     'urls': {
         'api': {
-            'public': 'https://data-api.binance.vision/api/v3',
-            'fapiPublic': 'https://data-api.binance.vision/fapi/v1',
+            'fapiPublic': 'https://fapi.binance.com/fapi/v1',
+            'fapiPublicV2': 'https://fapi.binance.com/fapi/v2',
         }
     }
+})
 })
 
 def send_telegram(text):
