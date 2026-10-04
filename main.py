@@ -49,17 +49,18 @@ def send_telegram(text):
 def get_top_300_usdt_pairs():
     try:
         markets = exchange.load_markets()
-        symbols = [
-            s for s in markets 
-            if (s.endswith('/USDT:USDT') or s.endswith('/USDT')) and markets[s].get('swap', False)
-        ]
+        symbols = []
+        for symbol, market in markets.items():
+            if market.get('swap') and market.get('quote') == 'USDT' and market.get('active', True):
+                symbols.append(symbol)
+        
         if len(symbols) > 0:
             return symbols[:300]
+        
         return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
     except Exception as e:
         logging.error(f"Error fetching symbols: {e}")
         return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
-
 def fetch_ohlcv(symbol, timeframe, limit=120):
     try:
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
