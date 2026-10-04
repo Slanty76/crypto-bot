@@ -1,4 +1,3 @@
-
 import time
 import requests
 import pandas as pd
@@ -23,7 +22,7 @@ TIMEFRAMES = {
     'SWING_4H': '4h'
 }
 
-# Direct Binance Futures Setup (No Proxy Issue)
+# Direct Binance Futures Setup (Bypassing broken worker proxy)
 exchange = ccxt.binance({
     'enableRateLimit': True,
     'options': {
