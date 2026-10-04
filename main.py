@@ -51,18 +51,18 @@ def get_top_300_usdt_pairs():
         markets = exchange.load_markets()
         symbols = [
             s for s in markets 
-            if s.endswith('/USDT') and markets[s]['active'] and not any(x in s for x in ['BEAR', 'BULL', 'UP', 'DOWN'])
+            if (s.endswith('/USDT') or s.endswith('/USDT:USDT')) and markets[s].get('swap', False)
         ]
-        tickers = exchange.fetch_tickers(symbols[:300])
+        tickers = exchange.fetch_tickers(symbols)
         sorted_symbols = sorted(
-            tickers, 
-            key=lambda x: tickers[x]['quoteVolume'] if tickers[x]['quoteVolume'] else 0, 
+            tickers,
+            key=lambda x: tickers[x].get('quoteVolume', 0) if tickers[x].get('quoteVolume') is not None else 0,
             reverse=True
         )
         return sorted_symbols[:300]
     except Exception as e:
         logging.error(f"Error fetching symbols: {e}")
-        return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 'ADA/USDT', 'AVAX/USDT']
+        return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
 
 def fetch_ohlcv(symbol, timeframe, limit=120):
     try:
