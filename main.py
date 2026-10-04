@@ -51,15 +51,11 @@ def get_top_300_usdt_pairs():
         markets = exchange.load_markets()
         symbols = [
             s for s in markets 
-            if (s.endswith('/USDT') or s.endswith('/USDT:USDT')) and markets[s].get('swap', False)
+            if (s.endswith('/USDT:USDT') or s.endswith('/USDT')) and markets[s].get('swap', False)
         ]
-        tickers = exchange.fetch_tickers(symbols)
-        sorted_symbols = sorted(
-            tickers,
-            key=lambda x: tickers[x].get('quoteVolume', 0) if tickers[x].get('quoteVolume') is not None else 0,
-            reverse=True
-        )
-        return sorted_symbols[:300]
+        if len(symbols) > 0:
+            return symbols[:300]
+        return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
     except Exception as e:
         logging.error(f"Error fetching symbols: {e}")
         return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
