@@ -30,7 +30,8 @@ exchange = ccxt.binance({
     },
     'urls': {
         'api': {
-            'public': 'https://data-api.binance.vision/api',
+            'public': 'https://data-api.binance.vision/api/v3',
+            'fapiPublic': 'https://data-api.binance.vision/fapi/v1',
         }
     }
 })
