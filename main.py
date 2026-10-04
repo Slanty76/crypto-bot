@@ -36,7 +36,6 @@ exchange = ccxt.binance({
         }
     }
 })
-})
 
 def send_telegram(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
