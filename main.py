@@ -1,3 +1,4 @@
+
 import time
 import requests
 import pandas as pd
@@ -22,19 +23,12 @@ TIMEFRAMES = {
     'SWING_4H': '4h'
 }
 
-# CCXT Binance Global Exchange Setup
+# Direct Binance Futures Setup (No Proxy Issue)
 exchange = ccxt.binance({
     'enableRateLimit': True,
     'options': {
         'defaultType': 'future',
         'adjustForTimeDifference': True,
-    },
-    'urls': {
-        'api': {
-            'public': 'https://binance-proxy.zerodev.workers.dev/api/v3',
-            'fapiPublic': 'https://binance-proxy.zerodev.workers.dev/fapi/v1',
-            'fapiPublicV2': 'https://binance-proxy.zerodev.workers.dev/fapi/v2',
-        }
     }
 })
 
@@ -55,6 +49,7 @@ def get_top_300_usdt_pairs():
                 symbols.append(symbol)
         
         if len(symbols) > 0:
+            logging.info(f"Successfully loaded {len(symbols)} USDT Futures pairs.")
             return symbols[:300]
         
         return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
