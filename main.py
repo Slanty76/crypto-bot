@@ -31,8 +31,9 @@ exchange = ccxt.binance({
     },
     'urls': {
         'api': {
-            'fapiPublic': 'https://fapi.binance.com/fapi/v1',
-            'fapiPublicV2': 'https://fapi.binance.com/fapi/v2',
+            'public': 'https://binance-proxy.zerodev.workers.dev/api/v3',
+            'fapiPublic': 'https://binance-proxy.zerodev.workers.dev/fapi/v1',
+            'fapiPublicV2': 'https://binance-proxy.zerodev.workers.dev/fapi/v2',
         }
     }
 })
