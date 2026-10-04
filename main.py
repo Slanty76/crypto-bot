@@ -61,6 +61,7 @@ def get_top_300_usdt_pairs():
     except Exception as e:
         logging.error(f"Error fetching symbols: {e}")
         return ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT']
+
 def fetch_ohlcv(symbol, timeframe, limit=120):
     try:
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -78,167 +79,90 @@ def compute_indicators(df):
     rs = gain / (loss + 1e-9)
     df['rsi'] = 100 - (100 / (1 + rs))
 
-    # 2. ADX (14)
+    # 2. ATR (14)
     df['tr0'] = abs(df['high'] - df['low'])
     df['tr1'] = abs(df['high'] - df['close'].shift(1))
     df['tr2'] = abs(df['low'] - df['close'].shift(1))
     df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
+    df['atr'] = df['tr'].rolling(14).mean()
 
-    df['up_move'] = df['high'] - df['high'].shift(1)
-    df['down_move'] = df['low'].shift(1) - df['low']
-    df['plus_di'] = np.where((df['up_move'] > df['down_move']) & (df['up_move'] > 0), df['up_move'], 0)
-    df['minus_di'] = np.where((df['down_move'] > df['up_move']) & (df['down_move'] > 0), df['down_move'], 0)
-
-    tr_s = df['tr'].rolling(14).sum()
-    df['plus_di_s'] = 100 * (df['plus_di'].rolling(14).sum() / (tr_s + 1e-9))
-    df['minus_di_s'] = 100 * (df['minus_di'].rolling(14).sum() / (tr_s + 1e-9))
-    df['dx'] = 100 * (abs(df['plus_di_s'] - df['minus_di_s']) / (df['plus_di_s'] + df['minus_di_s'] + 1e-9))
-    df['adx'] = df['dx'].rolling(14).mean()
-
-    # 3. EMAs
-    df['ema_20'] = df['close'].ewm(span=20, adjust=False).mean()
-    df['ema_50'] = df['close'].ewm(span=50, adjust=False).mean()
+    # 3. EMA
+    df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
+    df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
     df['ema_200'] = df['close'].ewm(span=200, adjust=False).mean()
-
-    # 4. VWAP
-    df['vwap'] = (df['volume'] * (df['high'] + df['low'] + df['close']) / 3).cumsum() / (df['volume'].cumsum() + 1e-9)
-
-    # 5. Volume Profile Spike
-    df['vol_ma'] = df['volume'].rolling(20).mean()
-    df['vol_ratio'] = df['volume'] / (df['vol_ma'] + 1e-9)
-
-    # 6. SuperTrend (ATR Based)
-    high_low = df['high'] - df['low']
-    high_cp = np.abs(df['high'] - df['close'].shift(1))
-    low_cp = np.abs(df['low'] - df['close'].shift(1))
-    df['atr'] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1).rolling(10).mean()
-    
-    basic_upper = (df['high'] + df['low']) / 2 + (3 * df['atr'])
-    basic_lower = (df['high'] + df['low']) / 2 - (3 * df['atr'])
-    df['supertrend'] = np.where(df['close'] > basic_lower, 1, -1)
 
     return df
 
-def smc_fvg_detector(df):
-    prev1 = df.iloc[-2]
-    prev2 = df.iloc[-3]
-    if prev1['low'] > prev2['high']:
-        return 'BULLISH_FVG'
-    elif prev1['high'] < prev2['low']:
-        return 'BEARISH_FVG'
-    return 'NEUTRAL'
+def generate_features(df):
+    df['return'] = df['close'].pct_change()
+    df['volatility'] = df['return'].rolling(10).std()
+    df['target'] = np.where(df['close'].shift(-1) > df['close'], 1, 0)
+    return df.dropna()
 
-def ai_signal_probability_score(df):
-    """ AI Random Forest Model Score Calculation """
-    try:
-        temp = df[['close', 'volume', 'rsi', 'adx', 'vol_ratio', 'supertrend']].dropna().copy()
-        if len(temp) < 40:
-            return 70  # Default safe high score if data limited
-
-        # Synthetic Target creation for online lightweight ML training
-        temp['target'] = np.where(temp['close'].shift(-2) > temp['close'], 1, 0)
-        
-        X = temp[['rsi', 'adx', 'vol_ratio', 'supertrend']]
-        y = temp['target']
-
-        model = RandomForestClassifier(n_estimators=30, max_depth=4, random_state=42)
-        model.fit(X[:-2], y[:-2])
-        
-        probs = model.predict_proba(X.iloc[[-1]])[0]
-        # Probability for winning direction
-        confidence = max(probs) * 100
-        return round(confidence, 1)
-    except Exception:
-        return 68.0
-
-def process_market_signal(symbol, timeframe, mode_name):
-    df = fetch_ohlcv(symbol, timeframe)
-    if df is None or len(df) < 60:
-        return
-
-    df = compute_indicators(df)
-    fvg = smc_fvg_detector(df)
-    ai_score = ai_signal_probability_score(df)
-
-    # Filter out weak setups using AI Confidence (>60% Threshold)
-    if ai_score < 60:
-        return
-
-    curr_close = df['close'].iloc[-1]
-    vol_ratio = df['vol_ratio'].iloc[-1]
-    rsi = df['rsi'].iloc[-1]
-    adx = df['adx'].iloc[-1]
-    ema20 = df['ema_20'].iloc[-1]
-    ema50 = df['ema_50'].iloc[-1]
-    ema200 = df['ema_200'].iloc[-1]
-    vwap = df['vwap'].iloc[-1]
-    supertrend = df['supertrend'].iloc[-1]
-
-    # Conditions
-    bullish_momentum = (curr_close > ema20) and (ema20 > ema50) and (curr_close > vwap)
-    bearish_momentum = (curr_close < ema20) and (ema20 < ema50) and (curr_close < vwap)
+def train_ml_model(df):
+    features = ['rsi', 'atr', 'ema_9', 'ema_21', 'volatility']
+    X = df[features]
+    y = df['target']
     
-    volume_surge = vol_ratio >= 1.6  # 1.6x Volume Surge
-    strong_adx = adx > 18
+    if len(X) < 30:
+        return None
+        
+    model = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42)
+    model.fit(X[:-1], y[:-1])
+    return model
 
-    signal = None
+def analyze_market():
+    symbols = get_top_300_usdt_pairs()
+    logging.info(f"Scanning {len(symbols)} Binance pairs across multiple timeframes...")
 
-    # Scalping 15M Logic (Fast & High Volume Signals)
-    if mode_name == "SCALPING_15M":
-        if bullish_momentum and volume_surge and (rsi < 72) and supertrend == 1:
-            signal = "🚀 HIGH-PROBABILITY SCALP BUY"
-        elif bearish_momentum and volume_surge and (rsi > 28) and supertrend == -1:
-            signal = "🔻 HIGH-PROBABILITY SCALP SELL"
-
-    # Swing 1H & 4H Logic (Institutional Trend Following)
-    else:
-        if bullish_momentum and strong_adx and (curr_close > ema200) and (fvg == 'BULLISH_FVG' or volume_surge):
-            signal = f"🐋 INSTITUTIONAL SWING BUY ({mode_name})"
-        elif bearish_momentum and strong_adx and (curr_close < ema200) and (fvg == 'BEARISH_FVG' or volume_surge):
-            signal = f"🐋 INSTITUTIONAL SWING SELL ({mode_name})"
-
-    if signal:
-        msg = (
-            f"⚡ <b>{signal}</b> ⚡\n\n"
-            f"<b>Coin:</b> {symbol}\n"
-            f"<b>Mode/Timeframe:</b> {mode_name} ({timeframe})\n"
-            f"<b>Price:</b> {curr_close}\n"
-            f"<b>AI Probability Score:</b> {ai_score}%\n"
-            f"<b>Volume Surge:</b> {round(vol_ratio, 2)}x\n"
-            f"<b>RSI:</b> {round(rsi, 1)} | <b>ADX:</b> {round(adx, 1)}\n"
-            f"<b>Indicators:</b> SuperTrend ✅ | VWAP Alignment ✅ | SMC FVG ({fvg})"
-        )
-        send_telegram(msg)
-        logging.info(f"Signal Alert Fired: {symbol} [{signal}]")
-
-def run_bot():
-    send_telegram(
-        "🔥 <b>AI Institutional Hybrid Engine Live!</b>\n"
-        "Scanning 300+ Binance Coins (15M Scalping, 1H & 4H Swing Active)."
-    )
-    
-    while True:
+    for symbol in symbols:
         try:
-            top_coins = get_top_300_usdt_pairs()
-            logging.info(f"Scanning {len(top_coins)} Binance pairs across multiple timeframes...")
+            for tf_name, tf_code in TIMEFRAMES.items():
+                df = fetch_ohlcv(symbol, tf_code)
+                if df is None or len(df) < 50:
+                    continue
 
-            for symbol in top_coins:
-                # 1. Scalping Check (15m)
-                process_market_signal(symbol, TIMEFRAMES['SCALPING_15M'], "SCALPING_15M")
+                df = compute_indicators(df)
+                df_feat = generate_features(df)
                 
-                # 2. Swing Check (1H)
-                process_market_signal(symbol, TIMEFRAMES['SWING_1H'], "SWING_1H")
+                if df_feat.empty:
+                    continue
 
-                # 3. Swing Check (4H)
-                process_market_signal(symbol, TIMEFRAMES['SWING_4H'], "SWING_4H")
+                model = train_ml_model(df_feat)
+                latest = df_feat.iloc[-1]
 
-                time.sleep(0.08)  # API Rate-Limit protection
+                # Prediction
+                features = ['rsi', 'atr', 'ema_9', 'ema_21', 'volatility']
+                pred = model.predict([latest[features]])[0] if model else 0
 
-            time.sleep(20)  # Wait 20 sec between full market cycles
+                # Signal Logic
+                signal = None
+                if latest['rsi'] < 35 and latest['ema_9'] > latest['ema_21'] and pred == 1:
+                    signal = "BUY/LONG"
+                elif latest['rsi'] > 65 and latest['ema_9'] < latest['ema_21'] and pred == 0:
+                    signal = "SELL/SHORT"
+
+                if signal:
+                    msg = (
+                        f"🚨 <b>{signal} SIGNAL DETECTED</b> 🚨\n\n"
+                        f"<b>Pair:</b> {symbol}\n"
+                        f"<b>Timeframe:</b> {tf_name} ({tf_code})\n"
+                        f"<b>Price:</b> {latest['close']:.4f}\n"
+                        f"<b>RSI:</b> {latest['rsi']:.2f}\n"
+                        f"<b>EMA 9/21:</b> {latest['ema_9']:.4f} / {latest['ema_21']:.4f}\n"
+                    )
+                    send_telegram(msg)
+                    logging.info(f"Signal sent for {symbol} on {tf_name}")
 
         except Exception as e:
-            logging.error(f"Global Loop Error: {e}")
-            time.sleep(10)
+            logging.error(f"Error processing {symbol}: {e}")
 
 if __name__ == "__main__":
-    run_bot()
+    while True:
+        try:
+            analyze_market()
+            logging.info("Scan completed. Sleeping for 3 minutes...")
+            time.sleep(180)
+        except Exception as e:
+            logging.error(f"Main loop error: {e}")
+            time.sleep(60)
