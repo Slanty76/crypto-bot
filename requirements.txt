@@ -1,6 +1,9 @@
-python-telegram-bot
 ccxt
 pandas
 numpy
 scikit-learn
-requests
+xgboost
+torch
+scipy
+flask
+gunicorn
