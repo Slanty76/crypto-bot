@@ -21,18 +21,22 @@ LATEST_SIGNALS = []      # Active live signals
 DAILY_SIGNAL_LOG = []    # 24-Hour History Log
 TOTAL_SCANNED = 0
 LAST_UPDATED = "Initializing AI Engine..."
-FEAR_GREED_INDEX = "72 (Greed)"
-MARKET_BIAS = "BUY / LONG 🟢"
 
-# Dynamic Live Backtesting Counters
+# Live Whale & Institutional Summary Metrics
+INSTITUTIONAL_SUMMARY = {
+    "action": "SCANNING WHALE FLOWS... 🐋",
+    "bias": "NEUTRAL ⚡",
+    "buying_coins": 0,
+    "selling_coins": 0,
+    "trap_warning": "NO ACTIVE TRAP DETECTED 🛡️"
+}
+
 LIVE_STATS = {
     "total_signals": 0,
     "tp_hits": 0,
     "sl_hits": 0,
     "win_rate": "0.0%"
 }
-
-INSTITUTIONAL_ACTION = "WHALE ACCUMULATION 🐋 (Smart Money Long)"
 
 TELEGRAM_BOT_TOKEN = "8841397774:AAGJFh8F_Y52UOq1f_e8i62FLf_5jtM0T7M"
 TELEGRAM_CHAT_ID = "6820937588"
@@ -127,7 +131,7 @@ def analyze_coin_ml(symbol, df):
 
     atr = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
 
-    # Whale Activity
+    # Whale Volume Analysis
     whale_activity = "NORMAL VOLUME 📊"
     if vol_spike > 1.8 and change_pct > 0.15:
         whale_activity = "WHALE PUMP (BUYING) 🐋🟢"
@@ -138,7 +142,7 @@ def analyze_coin_ml(symbol, df):
     elif vol_spike > 1.3 and change_pct < 0:
         whale_activity = "WHALE DISTRIBUTION 🐋🔻"
 
-    # Retail SL Hunting Detector
+    # Retail SL Hunting Detection
     candle_body = abs(closes[-1] - opens[-1])
     upper_wick = highs[-1] - max(closes[-1], opens[-1])
     lower_wick = min(closes[-1], opens[-1]) - lows[-1]
@@ -149,7 +153,7 @@ def analyze_coin_ml(symbol, df):
     elif lower_wick > (candle_body * 2.0) and vol_spike > 1.2:
         sl_hunting = "🚨 LONG SL HUNT DETECTED"
 
-    # Fake Breakout Detector
+    # Breakout Verification
     fake_breakout = "CONFIRMED VALID BREAKOUT 🟢"
     if change_pct > 0.15 and (upper_wick > candle_body * 1.5 or vol_spike < 0.85):
         fake_breakout = "⚠️ FAKE BREAKOUT / BULL TRAP"
@@ -169,11 +173,11 @@ def analyze_coin_ml(symbol, df):
     sl = price - (atr * 1.1)
     tp = price + (atr * 2.2)
 
-    if change_pct > 0.10 and rsi > 48:
+    if change_pct > 0.08 and rsi > 48:
         signal = "BUY / LONG 🚀"
         sl = price - (atr * 1.1)
         tp = price + (atr * 2.2)
-    elif change_pct < -0.10 and rsi < 52:
+    elif change_pct < -0.08 and rsi < 52:
         signal = "SELL / SHORT 🔻"
         sl = price + (atr * 1.1)
         tp = price - (atr * 2.2)
@@ -205,7 +209,7 @@ def analyze_coin(args):
     return None
 
 def ultra_fast_scan_engine():
-    global LATEST_SIGNALS, DAILY_SIGNAL_LOG, TOTAL_SCANNED, LAST_UPDATED, INSTITUTIONAL_ACTION
+    global LATEST_SIGNALS, DAILY_SIGNAL_LOG, TOTAL_SCANNED, LAST_UPDATED, INSTITUTIONAL_SUMMARY
     sent_signals = set()
     current_day = get_pkt_date()
 
@@ -225,29 +229,46 @@ def ultra_fast_scan_engine():
             found_signals = []
             buy_vol_count = 0
             sell_vol_count = 0
+            traps_count = 0
 
             for symbol, df in raw_results:
-                sig_obj = analyze_coin((symbol, df))
+                sig_obj = analyze_coin_ml(symbol, df)
                 if sig_obj:
-                    found_signals.append(sig_obj)
                     if "BUYING" in sig_obj['whale_activity'] or "ACCUMULATION" in sig_obj['whale_activity']:
                         buy_vol_count += 1
                     elif "SELLING" in sig_obj['whale_activity'] or "DISTRIBUTION" in sig_obj['whale_activity']:
                         sell_vol_count += 1
 
-                    sig_id = f"{symbol}_{sig_obj['time'][:5]}"
-                    if sig_id not in sent_signals:
-                        send_telegram_alert(sig_obj)
-                        sent_signals.add(sig_id)
-                        DAILY_SIGNAL_LOG.insert(0, sig_obj)
-                        update_live_stats()
+                    if "DETECTED" in sig_obj['sl_hunting'] or "FAKE" in sig_obj['fake_breakout']:
+                        traps_count += 1
 
+                    if sig_obj['signal'] != "NEUTRAL ⏳":
+                        found_signals.append(sig_obj)
+                        sig_id = f"{symbol}_{sig_obj['time'][:5]}"
+                        if sig_id not in sent_signals:
+                            send_telegram_alert(sig_obj)
+                            sent_signals.add(sig_id)
+                            DAILY_SIGNAL_LOG.insert(0, sig_obj)
+                            update_live_stats()
+
+            # Global Institutional & Whale Action Tracker Update
             if buy_vol_count > sell_vol_count:
-                INSTITUTIONAL_ACTION = f"WHALES BUYING / LONG 🐋🟢 ({buy_vol_count} Coins)"
+                INSTITUTIONAL_SUMMARY['action'] = f"WHALES BUYING / ACCUMULATING 🐋🟢"
+                INSTITUTIONAL_SUMMARY['bias'] = "STRONG BULLISH 🚀"
             elif sell_vol_count > buy_vol_count:
-                INSTITUTIONAL_ACTION = f"WHALES SELLING / SHORT 🐋🔻 ({sell_vol_count} Coins)"
+                INSTITUTIONAL_SUMMARY['action'] = f"WHALES SELLING / DUMPING 🐋🔻"
+                INSTITUTIONAL_SUMMARY['bias'] = "STRONG BEARISH 🔻"
             else:
-                INSTITUTIONAL_ACTION = "WHALE ACCUMULATION 🟢 (Long Bias)"
+                INSTITUTIONAL_SUMMARY['action'] = "SMART MONEY BALANCED / NEUTRAL ⚖️"
+                INSTITUTIONAL_SUMMARY['bias'] = "NEUTRAL ⚡"
+
+            INSTITUTIONAL_SUMMARY['buying_coins'] = buy_vol_count
+            INSTITUTIONAL_SUMMARY['selling_coins'] = sell_vol_count
+            
+            if traps_count > 0:
+                INSTITUTIONAL_SUMMARY['trap_warning'] = f"HIGH RISK: {traps_count} COINS TRAPPING RETAIL 🚨"
+            else:
+                INSTITUTIONAL_SUMMARY['trap_warning'] = "SAFE: NO LIQUIDATION TRAPS 🛡️"
 
             LATEST_SIGNALS = found_signals
             LAST_UPDATED = get_pkt_time()
@@ -273,19 +294,26 @@ HTML_TEMPLATE = """
         .title { font-size: 22px; font-weight: 700; color: #f0b90b; display: flex; align-items: center; gap: 10px; }
         .badge { background: rgba(240, 185, 11, 0.15); color: #f0b90b; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid rgba(240, 185, 11, 0.3); }
         
+        .whale-tracker-box { background: #181a20; border: 2px solid #f0b90b; padding: 18px; border-radius: 10px; margin-bottom: 20px; }
+        .whale-tracker-title { color: #f0b90b; font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .whale-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+        .whale-card { background: #121418; padding: 12px; border-radius: 6px; border: 1px solid #2b313a; }
+        .whale-card span { color: #848e9c; font-size: 11px; display: block; margin-bottom: 4px; }
+        .whale-card strong { font-size: 14px; font-weight: 700; }
+
         .backtest-box { background: #121418; border: 1px solid #0ecb81; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
         .backtest-item span { color: #848e9c; font-size: 11px; display: block; }
         .backtest-item strong { font-size: 15px; color: #0ecb81; font-weight: 700; }
 
-        .search-box-wrapper { background: #181a20; border: 1px solid #f0b90b; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .search-box-wrapper { background: #181a20; border: 1px solid #2b313a; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
         .search-title { color: #f0b90b; font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
         .search-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
         select { background: #121418; border: 1px solid #2b313a; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; outline: none; min-width: 180px; }
         .btn-analyze { background: #f0b90b; color: #000; font-weight: 700; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
         
-        .ml-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; background: #121418; padding: 12px; border-radius: 6px; }
-        .ml-item span { color: #848e9c; font-size: 11px; display: block; }
-        .ml-item strong { color: #fff; font-size: 13px; }
+        .ml-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; background: #121418; padding: 15px; border-radius: 6px; border: 1px solid #2b313a; margin-top: 10px; }
+        .ml-item span { color: #848e9c; font-size: 11px; display: block; margin-bottom: 4px; }
+        .ml-item strong { color: #fff; font-size: 13px; font-weight: 600; }
 
         .section-header { font-size: 16px; font-weight: 700; color: #f0b90b; margin: 25px 0 10px 0; display: flex; align-items: center; gap: 8px; }
 
@@ -310,159 +338,36 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
+    <!-- Live Whale & Institutional Smart Money Live Dashboard -->
+    <div class="whale-tracker-box">
+        <div class="whale-tracker-title">🐋 Live Institutional & Whale Smart Money Flow Tracker</div>
+        <div class="whale-grid">
+            <div class="whale-card">
+                <span>Whale Action Status</span>
+                <strong style="color: {% if 'BUYING' in whale_summary.action %}#0ecb81{% elif 'SELLING' in whale_summary.action %}#f6465d{% else %}#f0b90b{% endif %};">{{ whale_summary.action }}</strong>
+            </div>
+            <div class="whale-card">
+                <span>Market Bias</span>
+                <strong style="color: {% if 'BULLISH' in whale_summary.bias %}#0ecb81{% elif 'BEARISH' in whale_summary.bias %}#f6465d{% else %}#f0b90b{% endif %};">{{ whale_summary.bias }}</strong>
+            </div>
+            <div class="whale-card">
+                <span>Coins Whales Buying</span>
+                <strong style="color: #0ecb81;">{{ whale_summary.buying_coins }} Coins 🟢</strong>
+            </div>
+            <div class="whale-card">
+                <span>Coins Whales Selling</span>
+                <strong style="color: #f6465d;">{{ whale_summary.selling_coins }} Coins 🔻</strong>
+            </div>
+            <div class="whale-card">
+                <span>Retail Liquidation Traps</span>
+                <strong style="color: {% if 'HIGH' in whale_summary.trap_warning %}#f6465d{% else %}#0ecb81{% endif %};">{{ whale_summary.trap_warning }}</strong>
+            </div>
+        </div>
+    </div>
+
     <!-- Live Dynamic Backtesting Panel -->
     <div class="backtest-box">
         <div class="backtest-item"><span>Today's Total Signals</span><strong style="color: #fff;">{{ live_stats.total_signals }} Signals</strong></div>
         <div class="backtest-item"><span>Live Win Rate (24H)</span><strong style="color: #0ecb81;">{{ live_stats.win_rate }}</strong></div>
         <div class="backtest-item"><span>Successful Take Profits (TP)</span><strong style="color: #0ecb81;">{{ live_stats.tp_hits }} Trades</strong></div>
-        <div class="backtest-item"><span>Stop Loss Hits (SL)</span><strong style="color: #f6465d;">{{ live_stats.sl_hits }} Trades</strong></div>
-        <div class="backtest-item"><span>Strategy Status</span><strong style="color: #f0b90b;">ACTIVE & VALIDATED ⚡</strong></div>
-    </div>
-
-    <!-- Custom Coin Selector -->
-    <div class="search-box-wrapper">
-        <div class="search-title">🤖 Live ML Custom Coin Analyzer</div>
-        <form class="search-form" action="/" method="GET">
-            <select name="selected_coin">
-                {% for pair in pairs %}
-                    <option value="{{ pair }}" {% if pair == selected_pair %}selected{% endif %}>{{ pair.replace('USDT','') }}/USDT</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn-analyze">Analyze Coin with ML ⚡</button>
-        </form>
-
-        {% if custom_ml %}
-        <div class="ml-result-grid">
-            <div class="ml-item"><span>Selected Coin</span><strong style="color: #f0b90b;">{{ custom_ml.symbol }}</strong></div>
-            <div class="ml-item"><span>Current Price</span><strong>{{ custom_ml.price }}</strong></div>
-            <div class="ml-item"><span>AI Signal Action</span><strong style="color: #0ecb81;">{{ custom_ml.signal }}</strong></div>
-            <div class="ml-item"><span>Whale Volume Status</span><strong style="color: #0ecb81;">{{ custom_ml.whale_activity }}</strong></div>
-            <div class="ml-item"><span>Retail SL Hunt Detection</span><strong style="color: {% if 'DETECTED' in custom_ml.sl_hunting %}#f6465d{% else %}#0ecb81{% endif %};">{{ custom_ml.sl_hunting }}</strong></div>
-            <div class="ml-item"><span>Breakout Verification</span><strong style="color: {% if 'FAKE' in custom_ml.fake_breakout %}#f6465d{% else %}#0ecb81{% endif %};">{{ custom_ml.fake_breakout }}</strong></div>
-            <div class="ml-item"><span>ML Confidence</span><strong style="color: #f0b90b;">{{ custom_ml.prob }}</strong></div>
-            <div class="ml-item"><span>Calculated SL</span><strong style="color: #f6465d;">{{ custom_ml.sl }}</strong></div>
-            <div class="ml-item"><span>Calculated TP</span><strong style="color: #0ecb81;">{{ custom_ml.tp }}</strong></div>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Active Live Signals Table -->
-    <div class="section-header">⚡ Active Real-Time Signals</div>
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Pair</th>
-                    <th>Whale Volume Action</th>
-                    <th>Retail SL Hunt Alert</th>
-                    <th>Breakout Verification</th>
-                    <th>ML Confidence</th>
-                    <th>Stop Loss (SL)</th>
-                    <th>Take Profit (TP)</th>
-                    <th>Signal Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if signals %}
-                    {% for sig in signals %}
-                    <tr>
-                        <td style="color: #848e9c;">{{ sig.time }}</td>
-                        <td style="font-weight: 700; color: #ffffff;">{{ sig.symbol }}</td>
-                        <td style="font-size: 12px; font-weight: 600; color: #f0b90b;">{{ sig.whale_activity }}</td>
-                        <td style="font-size: 12px; font-weight: 600; color: {% if 'DETECTED' in sig.sl_hunting %}#f6465d{% else %}#0ecb81{% endif %};">{{ sig.sl_hunting }}</td>
-                        <td style="font-size: 12px; font-weight: 600; color: {% if 'FAKE' in sig.fake_breakout %}#f6465d{% else %}#0ecb81{% endif %};">{{ sig.fake_breakout }}</td>
-                        <td style="color: #f0b90b; font-weight: 700;">🤖 {{ sig.prob }}</td>
-                        <td style="color: #f6465d;">{{ sig.sl }}</td>
-                        <td style="color: #0ecb81;">{{ sig.tp }}</td>
-                        <td>
-                            <span class="{{ 'badge-long' if 'LONG' in sig.signal or 'BUY' in sig.signal else 'badge-short' }}">
-                                {{ sig.signal }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px 20px; color: #848e9c;">
-                            🤖 Multi-threaded ML engine actively scanning 40 coins in parallel... Live signals updating!
-                        </td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- 24-Hour Signal History Log -->
-    <div class="section-header">📜 Today's Signal History Log (24-Hours Memory)</div>
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Pair</th>
-                    <th>Whale Activity</th>
-                    <th>Entry Price</th>
-                    <th>ML Confidence</th>
-                    <th>Stop Loss (SL)</th>
-                    <th>Take Profit (TP)</th>
-                    <th>Signal Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if daily_log %}
-                    {% for sig in daily_log %}
-                    <tr>
-                        <td style="color: #848e9c;">{{ sig.time }}</td>
-                        <td style="font-weight: 700; color: #ffffff;">{{ sig.symbol }}</td>
-                        <td style="font-size: 12px;">{{ sig.whale_activity }}</td>
-                        <td style="font-weight: 600;">{{ sig.price }}</td>
-                        <td style="color: #f0b90b; font-weight: 700;">🤖 {{ sig.prob }}</td>
-                        <td style="color: #f6465d;">{{ sig.sl }}</td>
-                        <td style="color: #0ecb81;">{{ sig.tp }}</td>
-                        <td>
-                            <span class="{{ 'badge-long' if 'LONG' in sig.signal or 'BUY' in sig.signal else 'badge-short' }}">
-                                {{ sig.signal }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 40px 20px; color: #848e9c;">
-                            📜 No history logged yet for today. Signals will accumulate here automatically throughout the day!
-                        </td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
-</body>
-</html>
-"""
-
-@app.route('/')
-def home():
-    selected_pair = request.args.get('selected_coin', 'BTCUSDT')
-    symbol, df = fetch_klines_fast(selected_pair)
-    custom_ml_data = analyze_coin_ml(symbol, df)
-
-    return render_template_string(
-        HTML_TEMPLATE, 
-        signals=LATEST_SIGNALS, 
-        daily_log=DAILY_SIGNAL_LOG,
-        live_stats=LIVE_STATS,
-        total_scanned=TOTAL_SCANNED, 
-        last_updated=LAST_UPDATED, 
-        pairs=STABLE_PAIRS,
-        selected_pair=selected_pair,
-        custom_ml=custom_ml_data
-    )
-
-if __name__ == '__main__':
-    t = threading.Thread(target=ultra_fast_scan_engine)
-    t.daemon = True
-    t.start()
-
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+        <div class="backtest-item"><span>Stop Loss Hits (SL)</span><strong style="color: #
