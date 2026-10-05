@@ -4,7 +4,7 @@ import threading
 import logging
 import requests
 import datetime
-import pytz
+from zoneinfo import ZoneInfo
 import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 app = Flask(__name__)
 
-LOCAL_TZ = pytz.timezone('Asia/Karachi')
+LOCAL_TZ = ZoneInfo('Asia/Karachi')
 
 # Global State Variables
 LATEST_SIGNALS = []      # Active live signals
@@ -57,7 +57,6 @@ def update_live_stats():
     global LIVE_STATS
     total = len(DAILY_SIGNAL_LOG)
     if total > 0:
-        # Simple simulated backtest tracking logic based on ML probability baseline
         tp_hits = sum(1 for s in DAILY_SIGNAL_LOG if float(s['prob'].replace('%','')) >= 75.0)
         sl_hits = total - tp_hits
         win_rate = round((tp_hits / total) * 100, 1)
@@ -212,7 +211,6 @@ def ultra_fast_scan_engine():
 
     while True:
         try:
-            # Reset daily history if date changes
             today = get_pkt_date()
             if today != current_day:
                 DAILY_SIGNAL_LOG = []
@@ -241,7 +239,6 @@ def ultra_fast_scan_engine():
                     if sig_id not in sent_signals:
                         send_telegram_alert(sig_obj)
                         sent_signals.add(sig_id)
-                        # Add to 24-Hour Daily Signal Log
                         DAILY_SIGNAL_LOG.insert(0, sig_obj)
                         update_live_stats()
 
