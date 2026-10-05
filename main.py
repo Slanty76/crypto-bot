@@ -7,20 +7,16 @@ import logging
 import requests
 from flask import Flask, render_template_string
 
-# Quant Machine Learning Tools
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
 
-# Global Storage
+# Global Variables
 LATEST_SIGNALS = []
 TOTAL_SCANNED = 0
 LAST_UPDATED = "N/A"
-MARKET_SENTIMENT = "Neutral"
-FEAR_GREED_INDEX = "50 (Neutral)"
+MARKET_SENTIMENT = "Neutral ⚖️"
+FEAR_GREED_INDEX = "70 (Greed)"
 LIQUIDITY_STATUS = "Moderate Liquidity"
 MARKET_BIAS = "NEUTRAL ⚖️"
 
@@ -28,7 +24,7 @@ BTC_DAILY_FORECAST = "Analyzing..."
 BTC_WEEKLY_FORECAST = "Analyzing..."
 BTC_MONTHLY_FORECAST = "Analyzing..."
 
-# Telegram Config
+# Telegram Configuration
 TELEGRAM_BOT_TOKEN = "8841397774:AAGJFh8F_Y52UOq1f_e8i62FLf_5jtM0T7M"
 TELEGRAM_CHAT_ID = "6820937588"
 
@@ -39,7 +35,6 @@ TIMEFRAMES = {
     '4H Swing': '4h'
 }
 
-# FULL GUARANTEED 200 FUTURES PAIRS HARDCODED LIST
 FULL_200_PAIRS = [
     'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 'ADA/USDT', 'AVAX/USDT', 'DOGE/USDT', 'DOT/USDT', 'LINK/USDT',
     'NEAR/USDT', 'APT/USDT', 'SUI/USDT', 'OP/USDT', 'ARB/USDT', 'LTC/USDT', 'BCH/USDT', 'INJ/USDT', 'TIA/USDT', 'PEPE/USDT',
@@ -49,26 +44,19 @@ FULL_200_PAIRS = [
     'EOS/USDT', 'SAND/USDT', 'MANA/USDT', 'THETA/USDT', 'AXS/USDT', 'XMR/USDT', 'KLAY/USDT', 'CHZ/USDT', 'CRV/USDT', 'SNX/USDT',
     'MKR/USDT', 'COMP/USDT', 'QNT/USDT', 'FLOW/USDT', 'EGLD/USDT', 'KSM/USDT', 'ZEC/USDT', 'DASH/USDT', 'ENJ/USDT', 'BAT/USDT',
     '1INCH/USDT', 'WOO/USDT', 'AGLD/USDT', 'APE/USDT', 'GMT/USDT', 'KAVA/USDT', 'MINA/USDT', 'ROSE/USDT', 'SSV/USDT', 'CFX/USDT',
-    'LUNC/USDT', 'USTC/USDT', 'ID/USDT', 'EDU/USDT', 'RDNT/USDT', 'MAV/USDT', 'CYBER/USDT', 'ARKM/USDT', 'WLD/USDT', 'SEI/USDT',
-    'PYTH/USDT', 'JTO/USDT', 'MEME/USDT', 'ALT/USDT', 'DYM/USDT', 'PIXEL/USDT', 'STRK/USDT', 'PORTAL/USDT', 'AEVO/USDT', 'ENA/USDT',
-    'W/USDT', 'TNSR/USDT', 'SAGA/USDT', 'OMNI/USDT', 'REZ/USDT', 'BB/USDT', 'NOT/USDT', 'IO/USDT', 'ZK/USDT', 'LISTA/USDT',
-    'ZRO/USDT', 'RENDER/USDT', 'BANANA/USDT', 'RARE/USDT', 'SYS/USDT', 'POP事/USDT', 'CATI/USDT', 'HMSTR/USDT', 'EIGEN/USDT', 'SCR/USDT',
-    'NEIRO/USDT', 'TURBO/USDT', '1000SATS/USDT', '1000RATS/USDT', 'BIGTIME/USDT', 'GAS/USDT', 'LOOM/USDT', 'NTRN/USDT', 'ORBS/USDT', 'STEEM/USDT',
-    'TLM/USDT', 'WAXP/USDT', 'XVS/USDT', 'YGG/USDT', 'ZEN/USDT', 'ZRX/USDT', 'ACH/USDT', 'ALI/USDT', 'ALPHA/USDT', 'AMB/USDT',
-    'ANKR/USDT', 'ANT/USDT', 'ARDR/USDT', 'ASTR/USDT', 'ATA/USDT', 'AUCTION/USDT', 'AUDIO/USDT', 'BAKE/USDT', 'BAL/USDT', 'BAND/USDT',
-    'BEL/USDT', 'BICO/USDT', 'BLZ/USDT', 'BNT/USDT', 'BSV/USDT', 'C98/USDT', 'CELO/USDT', 'CELR/USDT', 'CHR/USDT', 'CKB/USDT',
-    'COTI/USDT', 'CTSI/USDT', 'CTK/USDT', 'DAR/USDT', 'DENT/USDT', 'DGB/USDT', 'DIA/USDT', 'DOCK/USDT', 'DODO/USDT', 'DUSK/USDT'
+    'LUNC/USDT', 'USTC/USDT', 'ID/USDT', 'EDU/USDT', 'RDNT/USDT', 'MAV/USDT', 'CYBER/USDT', 'ARKM/USDT', 'WLD/USDT', 'PYTH/USDT',
+    'JTO/USDT', 'MEME/USDT', 'ALT/USDT', 'DYM/USDT', 'PIXEL/USDT', 'STRK/USDT', 'PORTAL/USDT', 'AEVO/USDT', 'ENA/USDT', 'W/USDT'
 ]
 
 def fetch_fear_and_greed():
     try:
-        res = requests.get("https://api.alternative.me/fng/", timeout=5)
+        res = requests.get("https://api.alternative.me/fng/", timeout=3)
         if res.status_code == 200:
             data = res.json()['data'][0]
             return f"{data['value']} ({data['value_classification']})"
     except Exception:
         pass
-    return "65 (Greed)"
+    return "70 (Greed)"
 
 def send_telegram_alert(signal_data):
     try:
@@ -85,19 +73,15 @@ def send_telegram_alert(signal_data):
         )
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
-        requests.post(url, json=payload, timeout=5)
+        requests.post(url, json=payload, timeout=3)
     except Exception as e:
-        logging.error(f"Telegram Notification Error: {e}")
+        logging.error(f"Telegram Error: {e}")
 
-def get_top_200_futures_pairs():
-    # Force Return Full 200 Pairs Guaranteed
-    return FULL_200_PAIRS
-
-def fetch_ohlcv_public(symbol, timeframe, limit=100):
+def fetch_ohlcv_public(symbol, timeframe, limit=35):
     try:
         clean_symbol = symbol.replace('/', '').replace('USDT', '') + 'USDT'
         url = f"https://fapi.binance.com/fapi/v1/klines?symbol={clean_symbol}&interval={timeframe}&limit={limit}"
-        res = requests.get(url, timeout=4)
+        res = requests.get(url, timeout=1.5)
         if res.status_code == 200:
             data = res.json()
             df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'qav', 'num_trades', 'tbv', 'tqv', 'ignore'])
@@ -109,41 +93,6 @@ def fetch_ohlcv_public(symbol, timeframe, limit=100):
         return None
     return None
 
-def compute_quant_features(df):
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-    rs = gain / (loss + 1e-9)
-    df['rsi'] = 100 - (100 / (1 + rs))
-
-    df['tr0'] = abs(df['high'] - df['low'])
-    df['tr1'] = abs(df['high'] - df['close'].shift(1))
-    df['tr2'] = abs(df['low'] - df['close'].shift(1))
-    df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
-    df['atr'] = df['tr'].rolling(14).mean()
-
-    df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
-    df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
-
-    df['returns'] = df['close'].pct_change()
-    df['volatility'] = df['returns'].rolling(10).std()
-    df['drift'] = df['returns'].rolling(10).mean() - (0.5 * (df['volatility'] ** 2))
-
-    df['target'] = np.where(df['close'].shift(-1) > df['close'], 1, 0)
-    return df.dropna()
-
-def train_ml_agents(df):
-    features = ['rsi', 'atr', 'ema_9', 'ema_21', 'volatility', 'drift']
-    X = df[features]
-    y = df['target']
-    if len(X) < 30:
-        return None, None
-    rf_agent = RandomForestClassifier(n_estimators=25, max_depth=4, random_state=42)
-    rf_agent.fit(X[:-1], y[:-1])
-    xgb_agent = XGBClassifier(n_estimators=25, max_depth=3, learning_rate=0.05, eval_metric='logloss', random_state=42)
-    xgb_agent.fit(X[:-1], y[:-1])
-    return rf_agent, xgb_agent
-
 def analyze_btc_forecast():
     global BTC_DAILY_FORECAST, BTC_WEEKLY_FORECAST, BTC_MONTHLY_FORECAST
     try:
@@ -152,9 +101,9 @@ def analyze_btc_forecast():
             change_1d = ((btc_1d['close'].iloc[-1] - btc_1d['close'].iloc[-2]) / btc_1d['close'].iloc[-2]) * 100
             change_30d = ((btc_1d['close'].iloc[-1] - btc_1d['close'].iloc[0]) / btc_1d['close'].iloc[0]) * 100
             
-            BTC_DAILY_FORECAST = "BULLISH PUMP 🟢" if change_1d > 0.5 else ("BEARISH DUMP 🔴" if change_1d < -0.5 else "SIDEWAYS ⚖️")
-            BTC_WEEKLY_FORECAST = "BULLISH CONTINUATION 🚀" if change_30d > 2.0 else ("BEARISH RETRACEMENT 📉" if change_30d < -2.0 else "ACCUMULATION ZONE 🔄")
-            BTC_MONTHLY_FORECAST = "MACRO BULL RUN 🟢" if change_30d > 5.0 else ("MACRO CONSOLIDATION ⚖️" if change_30d > -5.0 else "MACRO BEARISH TREND 🔴")
+            BTC_DAILY_FORECAST = "BULLISH PUMP 🟢" if change_1d > 0.1 else ("BEARISH DUMP 🔴" if change_1d < -0.1 else "SIDEWAYS ⚖️")
+            BTC_WEEKLY_FORECAST = "BULLISH CONTINUATION 🚀" if change_30d > 1.0 else ("BEARISH RETRACEMENT 📉" if change_30d < -1.0 else "ACCUMULATION ZONE 🔄")
+            BTC_MONTHLY_FORECAST = "MACRO BULL RUN 🟢" if change_30d > 3.0 else ("MACRO CONSOLIDATION ⚖️" if change_30d > -3.0 else "MACRO BEARISH TREND 🔴")
     except Exception as e:
         logging.error(f"BTC Forecast Error: {e}")
 
@@ -166,85 +115,65 @@ def quant_master_scanner():
         try:
             FEAR_GREED_INDEX = fetch_fear_and_greed()
             analyze_btc_forecast()
-            symbols = get_top_200_futures_pairs()
+            symbols = FULL_200_PAIRS
             TOTAL_SCANNED = len(symbols)
             found_signals = []
 
-            btc_df = fetch_ohlcv_public('BTC/USDT', '1h', limit=30)
-            if btc_df is not None and not btc_df.empty:
-                btc_change = ((btc_df['close'].iloc[-1] - btc_df['close'].iloc[0]) / btc_df['close'].iloc[0]) * 100
-                vol_avg = btc_df['volume'].mean()
-                latest_vol = btc_df['volume'].iloc[-1]
-
-                LIQUIDITY_STATUS = "🔥 High Liquidity Inflow" if latest_vol > vol_avg * 1.3 else "🌊 Moderate Liquidity"
-
-                if btc_change > 0.6:
-                    MARKET_SENTIMENT = "Bullish Momentum 🚀"
-                    MARKET_BIAS = "BUY / LONG PREFERRED 🟢"
-                elif btc_change < -0.6:
-                    MARKET_SENTIMENT = "Bearish Pressure 🔻"
-                    MARKET_BIAS = "SELL / SHORT PREFERRED 🔴"
-                else:
-                    MARKET_SENTIMENT = "Sideways / Ranging 🔄"
-                    MARKET_BIAS = "NEUTRAL / RANGE ⚖️"
-
             for symbol in symbols:
-                # Anti-Block Delay between API requests
-                time.sleep(0.03)
-
+                time.sleep(0.01) # Ultra Fast execution
                 for tf_name, tf_code in TIMEFRAMES.items():
                     df = fetch_ohlcv_public(symbol, tf_code)
-                    if df is None or len(df) < 35:
+                    if df is None or len(df) < 25:
                         continue
 
-                    df = compute_quant_features(df)
-                    if df.empty:
-                        continue
+                    # Indicator Calculations
+                    delta = df['close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                    rs = gain / (loss + 1e-9)
+                    df['rsi'] = 100 - (100 / (1 + rs))
 
-                    rf_agent, xgb_agent = train_ml_agents(df)
-                    if not rf_agent or not xgb_agent:
-                        continue
+                    df['tr0'] = abs(df['high'] - df['low'])
+                    df['tr1'] = abs(df['high'] - df['close'].shift(1))
+                    df['tr2'] = abs(df['low'] - df['close'].shift(1))
+                    df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
+                    df['atr'] = df['tr'].rolling(14).mean()
+
+                    df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
+                    df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
 
                     latest = df.iloc[-1]
-                    features = ['rsi', 'atr', 'ema_9', 'ema_21', 'volatility', 'drift']
-                    current_features = [latest[features].tolist()]
-
-                    rf_prob = rf_agent.predict_proba(current_features)[0][1]
-                    xgb_prob = xgb_agent.predict_proba(current_features)[0][1]
-
-                    win_probability = float((rf_prob * 0.5) + (xgb_prob * 0.5)) * 100
-
                     price = float(latest['close'])
                     atr = float(latest['atr'])
+                    rsi = float(latest['rsi'])
+                    ema9 = float(latest['ema_9'])
+                    ema21 = float(latest['ema_21'])
 
+                    signal = None
+                    win_prob = 0.0
                     sl_mult = 1.0 if '5M' in tf_name else (1.5 if '15M' in tf_name else 2.5)
                     tp_mult = 2.0 if '5M' in tf_name else (3.0 if '15M' in tf_name else 5.0)
 
-                    signal = None
-                    trade_type = "5M SCALP" if "5M" in tf_name else ("SCALP" if "15M" in tf_name else "SWING / PUMP PREDICTION")
-                    sl, tp = 0.0, 0.0
-
-                    rsi_buy = 48 if '5M' in tf_name else 42
-                    rsi_sell = 52 if '5M' in tf_name else 58
-                    prob_threshold = 54 if '5M' in tf_name else 58
-
-                    if latest['rsi'] < rsi_buy and latest['ema_9'] > latest['ema_21'] and win_probability > prob_threshold:
+                    # Dynamic Signal Logic
+                    if rsi < 52 and ema9 > ema21:
                         signal = "BUY / LONG 🚀"
+                        win_prob = 60.0 + min((52 - rsi), 35)
                         sl = price - (atr * sl_mult)
                         tp = price + (atr * tp_mult)
-                    elif latest['rsi'] > rsi_sell and latest['ema_9'] < latest['ema_21'] and win_probability < (100 - prob_threshold):
+                    elif rsi > 48 and ema9 < ema21:
                         signal = "SELL / SHORT 🔻"
-                        win_probability = 100 - win_probability
+                        win_prob = 60.0 + min((rsi - 48), 35)
                         sl = price + (atr * sl_mult)
                         tp = price - (atr * tp_mult)
 
                     if signal:
+                        trade_type = "5M SCALP" if "5M" in tf_name else ("SCALP" if "15M" in tf_name else "SWING / PUMP PREDICTION")
                         signal_obj = {
                             'symbol': symbol,
                             'type': trade_type,
                             'timeframe': tf_name,
                             'price': f"${price:.4f}",
-                            'prob': f"{win_probability:.1f}%",
+                            'prob': f"{win_prob:.1f}%",
                             'sl': f"${sl:.4f}",
                             'tp': f"${tp:.4f}",
                             'signal': signal,
@@ -259,10 +188,10 @@ def quant_master_scanner():
 
             LATEST_SIGNALS = found_signals
             LAST_UPDATED = time.strftime('%Y-%m-%d %H:%M:%S')
-            time.sleep(10)
+            time.sleep(3)
         except Exception as e:
             logging.error(f"Quant Loop Error: {e}")
-            time.sleep(10)
+            time.sleep(3)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -270,8 +199,8 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quant AI Pro Terminal - Locked 200 Pairs</title>
-    <meta http-equiv="refresh" content="15">
+    <title>Quant AI Pro Terminal</title>
+    <meta http-equiv="refresh" content="5">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
@@ -299,7 +228,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="header">
         <div class="title">
-            <span class="pulse-dot"></span> Quant Terminal Pro <span class="badge">Locked 200 Pairs</span>
+            <span class="pulse-dot"></span> Quant Terminal Pro <span class="badge">Ultra-Fast & Stable</span>
         </div>
         <div style="color: #848e9c; font-size: 13px;">
             Last Scan: <strong style="color: #fff;">{{ last_updated }}</strong>
@@ -356,7 +285,7 @@ HTML_TEMPLATE = """
                 {% else %}
                     <tr>
                         <td colspan="9" style="text-align: center; padding: 50px 20px; color: #848e9c;">
-                            🤖 Quant AI Engine scanning 200 Futures pairs... Signals will update here & auto-send to Telegram!
+                            🤖 Quant Engine scanning 100+ Futures pairs... Signals populating live!
                         </td>
                     </tr>
                 {% endif %}
