@@ -271,7 +271,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quant Ultra Pro Terminal</title>
-    <meta http-equiv="refresh" content="8">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
@@ -291,13 +290,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .backtest-item span { color: #848e9c; font-size: 11px; display: block; }
         .backtest-item strong { font-size: 15px; color: #0ecb81; font-weight: 700; }
 
-        .search-box-wrapper { background: #181a20; border: 1px solid #2b313a; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .search-box-wrapper { background: #181a20; border: 1px solid #f0b90b; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
         .search-title { color: #f0b90b; font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-        .search-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .search-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
         select { background: #121418; border: 1px solid #2b313a; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; outline: none; min-width: 180px; }
         .btn-analyze { background: #f0b90b; color: #000; font-weight: 700; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
         
-        .ml-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; background: #121418; padding: 15px; border-radius: 6px; border: 1px solid #2b313a; margin-top: 10px; }
+        .ml-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; background: #121418; padding: 15px; border-radius: 6px; border: 1px solid #f0b90b; margin-top: 15px; }
         .ml-item span { color: #848e9c; font-size: 11px; display: block; margin-bottom: 4px; }
         .ml-item strong { color: #fff; font-size: 13px; font-weight: 600; }
 
@@ -484,7 +483,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 @app.route('/')
 def home():
-    selected_pair = request.args.get('selected_coin', 'ETHUSDT')
+    selected_pair = request.args.get('selected_coin', 'BTCUSDT')
     symbol, df = fetch_klines_fast(selected_pair)
     custom_ml_data = analyze_coin_ml(symbol, df)
 
