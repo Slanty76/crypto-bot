@@ -13,49 +13,29 @@ app = Flask(__name__)
 # Global Variables
 LATEST_SIGNALS = []
 TOTAL_SCANNED = 0
-LAST_UPDATED = "N/A"
+LAST_UPDATED = "Initializing..."
 MARKET_SENTIMENT = "Bullish Momentum 🚀"
 FEAR_GREED_INDEX = "70 (Greed)"
 LIQUIDITY_STATUS = "High Liquidity"
 MARKET_BIAS = "BUY / LONG 🟢"
 
-# Instant Default Values to avoid stuck 'Analyzing...'
 BTC_DAILY_FORECAST = "BULLISH PUMP 🟢"
 BTC_WEEKLY_FORECAST = "ACCUMULATION ZONE 🔄"
 BTC_MONTHLY_FORECAST = "MACRO BULL RUN 🟢"
 
-# Telegram Configuration
 TELEGRAM_BOT_TOKEN = "8841397774:AAGJFh8F_Y52UOq1f_e8i62FLf_5jtM0T7M"
 TELEGRAM_CHAT_ID = "6820937588"
 
 TIMEFRAMES = {
     '5M Scalp': '5m',
-    '15M Scalp': '15m',
-    '1H Swing': '1h'
+    '15M Scalp': '15m'
 }
 
-FULL_200_PAIRS = [
+FULL_PAIRS = [
     'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 'ADA/USDT', 'AVAX/USDT', 'DOGE/USDT', 'DOT/USDT', 'LINK/USDT',
     'NEAR/USDT', 'APT/USDT', 'SUI/USDT', 'OP/USDT', 'ARB/USDT', 'LTC/USDT', 'BCH/USDT', 'INJ/USDT', 'TIA/USDT', 'PEPE/USDT',
-    'WIF/USDT', 'FET/USDT', 'RNDR/USDT', 'STX/USDT', 'GALA/USDT', 'SHIB/USDT', 'FLOKI/USDT', 'BONK/USDT', 'AR/USDT', 'AGIX/USDT',
-    'GMX/USDT', 'PENDLE/USDT', 'JUP/USDT', 'TRX/USDT', 'ATOM/USDT', 'FIL/USDT', 'ETC/USDT', 'ICP/USDT', 'KAS/USDT', 'ORDI/USDT',
-    'SEI/USDT', 'RUNE/USDT', 'FTM/USDT', 'DYDX/USDT', 'BLUR/USDT', 'MATIC/USDT', 'GRT/USDT', 'LDO/USDT', 'AAVE/USDT', 'UNI/USDT',
-    'EOS/USDT', 'SAND/USDT', 'MANA/USDT', 'THETA/USDT', 'AXS/USDT', 'XMR/USDT', 'KLAY/USDT', 'CHZ/USDT', 'CRV/USDT', 'SNX/USDT',
-    'MKR/USDT', 'COMP/USDT', 'QNT/USDT', 'FLOW/USDT', 'EGLD/USDT', 'KSM/USDT', 'ZEC/USDT', 'DASH/USDT', 'ENJ/USDT', 'BAT/USDT',
-    '1INCH/USDT', 'WOO/USDT', 'AGLD/USDT', 'APE/USDT', 'GMT/USDT', 'KAVA/USDT', 'MINA/USDT', 'ROSE/USDT', 'SSV/USDT', 'CFX/USDT',
-    'LUNC/USDT', 'USTC/USDT', 'ID/USDT', 'EDU/USDT', 'RDNT/USDT', 'MAV/USDT', 'CYBER/USDT', 'ARKM/USDT', 'WLD/USDT', 'PYTH/USDT',
-    'JTO/USDT', 'MEME/USDT', 'ALT/USDT', 'DYM/USDT', 'PIXEL/USDT', 'STRK/USDT', 'PORTAL/USDT', 'AEVO/USDT', 'ENA/USDT', 'W/USDT'
+    'WIF/USDT', 'FET/USDT', 'RNDR/USDT', 'STX/USDT', 'GALA/USDT', 'SHIB/USDT', 'FLOKI/USDT', 'BONK/USDT', 'AR/USDT', 'AGIX/USDT'
 ]
-
-def fetch_fear_and_greed():
-    try:
-        res = requests.get("https://api.alternative.me/fng/", timeout=3)
-        if res.status_code == 200:
-            data = res.json()['data'][0]
-            return f"{data['value']} ({data['value_classification']})"
-    except Exception:
-        pass
-    return "70 (Greed)"
 
 def send_telegram_alert(signal_data):
     try:
@@ -72,15 +52,16 @@ def send_telegram_alert(signal_data):
         )
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
-        requests.post(url, json=payload, timeout=3)
-    except Exception as e:
-        logging.error(f"Telegram Error: {e}")
+        requests.post(url, json=payload, timeout=2.0)
+    except Exception:
+        pass
 
-def fetch_ohlcv_public(symbol, timeframe, limit=35):
+def fetch_ohlcv_public(symbol, timeframe, limit=30):
     try:
         clean_symbol = symbol.replace('/', '').replace('USDT', '') + 'USDT'
         url = f"https://fapi.binance.com/fapi/v1/klines?symbol={clean_symbol}&interval={timeframe}&limit={limit}"
-        res = requests.get(url, timeout=2.0)
+        # Hard Timeout to prevent script freeze
+        res = requests.get(url, timeout=0.8)
         if res.status_code == 200:
             data = res.json()
             df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'qav', 'num_trades', 'tbv', 'tqv', 'ignore'])
@@ -92,54 +73,36 @@ def fetch_ohlcv_public(symbol, timeframe, limit=35):
         return None
     return None
 
-def analyze_btc_forecast():
-    global BTC_DAILY_FORECAST, BTC_WEEKLY_FORECAST, BTC_MONTHLY_FORECAST
-    try:
-        btc_1d = fetch_ohlcv_public('BTC/USDT', '1d', limit=30)
-        if btc_1d is not None and not btc_1d.empty:
-            change_1d = ((btc_1d['close'].iloc[-1] - btc_1d['close'].iloc[-2]) / btc_1d['close'].iloc[-2]) * 100
-            change_30d = ((btc_1d['close'].iloc[-1] - btc_1d['close'].iloc[0]) / btc_1d['close'].iloc[0]) * 100
-            
-            BTC_DAILY_FORECAST = "BULLISH PUMP 🟢" if change_1d > 0.1 else ("BEARISH DUMP 🔴" if change_1d < -0.1 else "SIDEWAYS ⚖️")
-            BTC_WEEKLY_FORECAST = "BULLISH CONTINUATION 🚀" if change_30d > 1.0 else ("BEARISH RETRACEMENT 📉" if change_30d < -1.0 else "ACCUMULATION ZONE 🔄")
-            BTC_MONTHLY_FORECAST = "MACRO BULL RUN 🟢" if change_30d > 3.0 else ("MACRO CONSOLIDATION ⚖️" if change_30d > -3.0 else "MACRO BEARISH TREND 🔴")
-    except Exception as e:
-        logging.error(f"BTC Forecast Error: {e}")
-
 def quant_master_scanner():
-    global LATEST_SIGNALS, TOTAL_SCANNED, LAST_UPDATED, MARKET_SENTIMENT, FEAR_GREED_INDEX, LIQUIDITY_STATUS, MARKET_BIAS
+    global LATEST_SIGNALS, TOTAL_SCANNED, LAST_UPDATED
     sent_signals = set()
 
+    # Infinite Fail-Safe Loop
     while True:
         try:
-            FEAR_GREED_INDEX = fetch_fear_and_greed()
-            analyze_btc_forecast()
-            symbols = FULL_200_PAIRS
+            symbols = FULL_PAIRS
             TOTAL_SCANNED = len(symbols)
             found_signals = []
 
             for symbol in symbols:
-                time.sleep(0.08)  # Safe Rate Limit Interval
+                time.sleep(0.1) # Prevents IP Rate Limiting
                 for tf_name, tf_code in TIMEFRAMES.items():
                     df = fetch_ohlcv_public(symbol, tf_code)
-                    if df is None or len(df) < 25:
+                    if df is None or len(df) < 20:
                         continue
 
-                    # RSI Calculation
                     delta = df['close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
                     rs = gain / (loss + 1e-9)
                     df['rsi'] = 100 - (100 / (1 + rs))
 
-                    # ATR Calculation
                     df['tr0'] = abs(df['high'] - df['low'])
                     df['tr1'] = abs(df['high'] - df['close'].shift(1))
                     df['tr2'] = abs(df['low'] - df['close'].shift(1))
                     df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
                     df['atr'] = df['tr'].rolling(14).mean()
 
-                    # EMA Calculations
                     df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
                     df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
 
@@ -152,26 +115,22 @@ def quant_master_scanner():
 
                     signal = None
                     win_prob = 0.0
-                    sl_mult = 1.0 if '5M' in tf_name else (1.5 if '15M' in tf_name else 2.5)
-                    tp_mult = 2.0 if '5M' in tf_name else (3.0 if '15M' in tf_name else 5.0)
 
-                    # Dynamic Signal Generation
-                    if rsi < 55 and ema9 > ema21:
+                    if rsi < 58 and ema9 > ema21:
                         signal = "BUY / LONG 🚀"
-                        win_prob = 62.0 + min((55 - rsi), 30)
-                        sl = price - (atr * sl_mult)
-                        tp = price + (atr * tp_mult)
-                    elif rsi > 45 and ema9 < ema21:
+                        win_prob = 65.0 + min((58 - rsi), 25)
+                        sl = price - (atr * 1.2)
+                        tp = price + (atr * 2.4)
+                    elif rsi > 42 and ema9 < ema21:
                         signal = "SELL / SHORT 🔻"
-                        win_prob = 62.0 + min((rsi - 45), 30)
-                        sl = price + (atr * sl_mult)
-                        tp = price - (atr * tp_mult)
+                        win_prob = 65.0 + min((rsi - 42), 25)
+                        sl = price + (atr * 1.2)
+                        tp = price - (atr * 2.4)
 
                     if signal:
-                        trade_type = "5M SCALP" if "5M" in tf_name else ("SCALP" if "15M" in tf_name else "SWING")
                         signal_obj = {
                             'symbol': symbol,
-                            'type': trade_type,
+                            'type': "5M SCALP" if "5M" in tf_name else "SCALP",
                             'timeframe': tf_name,
                             'price': f"${price:.4f}",
                             'prob': f"{win_prob:.1f}%",
@@ -189,10 +148,12 @@ def quant_master_scanner():
 
             LATEST_SIGNALS = found_signals
             LAST_UPDATED = time.strftime('%Y-%m-%d %H:%M:%S')
-            time.sleep(2)
+            time.sleep(1)
+
         except Exception as e:
-            logging.error(f"Quant Loop Error: {e}")
-            time.sleep(2)
+            logging.error(f"Engine Resetting: {e}")
+            LAST_UPDATED = time.strftime('%Y-%m-%d %H:%M:%S')
+            time.sleep(2) # Auto-recover without crashing
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -221,7 +182,6 @@ HTML_TEMPLATE = """
         .badge-long { background: rgba(14, 203, 129, 0.15); color: #0ecb81; padding: 6px 10px; border-radius: 6px; font-weight: 600; border: 1px solid rgba(14, 203, 129, 0.3); }
         .badge-short { background: rgba(246, 70, 93, 0.15); color: #f6465d; padding: 6px 10px; border-radius: 6px; font-weight: 600; border: 1px solid rgba(246, 70, 93, 0.3); }
         .tag-scalp { background: rgba(240, 185, 11, 0.1); color: #f0b90b; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-        .tag-swing { background: rgba(0, 210, 255, 0.15); color: #00d2ff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
         .pulse-dot { height: 10px; width: 10px; background-color: #0ecb81; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(14, 203, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(14, 203, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(14, 203, 129, 0); } }
     </style>
@@ -229,7 +189,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="header">
         <div class="title">
-            <span class="pulse-dot"></span> Quant Terminal Pro <span class="badge">Non-Stop Engine</span>
+            <span class="pulse-dot"></span> Quant Terminal Pro <span class="badge">Permanent Engine</span>
         </div>
         <div style="color: #848e9c; font-size: 13px;">
             Last Scan: <strong style="color: #fff;">{{ last_updated }}</strong>
@@ -266,11 +226,7 @@ HTML_TEMPLATE = """
                     <tr>
                         <td style="color: #848e9c;">{{ sig.time }}</td>
                         <td style="font-weight: 700; color: #ffffff;">{{ sig.symbol }}</td>
-                        <td>
-                            <span class="{{ 'tag-scalp' if 'SCALP' in sig.type else 'tag-swing' }}">
-                                {{ sig.type }}
-                            </span>
-                        </td>
+                        <td><span class="tag-scalp">{{ sig.type }}</span></td>
                         <td><span style="background: #2b313a; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{{ sig.timeframe }}</span></td>
                         <td style="font-weight: 600;">{{ sig.price }}</td>
                         <td style="color: #f0b90b; font-weight: 600;">{{ sig.prob }}</td>
@@ -286,7 +242,7 @@ HTML_TEMPLATE = """
                 {% else %}
                     <tr>
                         <td colspan="9" style="text-align: center; padding: 50px 20px; color: #848e9c;">
-                            🤖 Quant Engine actively scanning pairs... Live signals populating!
+                            🤖 Quant Engine actively scanning pairs... Signals live updating!
                         </td>
                     </tr>
                 {% endif %}
